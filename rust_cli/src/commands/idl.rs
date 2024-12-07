@@ -40,8 +40,9 @@ pub fn upload_idl_by_file_path(
     program_id: &str,
     keypair_path: Option<&str>,
     priority_fees_per_cu: u64,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
-    upload_data_by_file_path(file_path, program_id, keypair_path, priority_fees_per_cu, IDL_SEED)
+    upload_data_by_file_path(file_path, program_id, keypair_path, priority_fees_per_cu, IDL_SEED, rpc_url)
 }
 
 pub fn upload_metadata_by_file_path(
@@ -49,8 +50,9 @@ pub fn upload_metadata_by_file_path(
     program_id: &str,
     keypair_path: Option<&str>,
     priority_fees_per_cu: u64,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
-    upload_data_by_file_path(metadata_path, program_id, keypair_path, priority_fees_per_cu, METADATA_SEED)
+    upload_data_by_file_path(metadata_path, program_id, keypair_path, priority_fees_per_cu, METADATA_SEED, rpc_url)
 }
 
 pub fn upload_idl_by_url(
@@ -58,9 +60,10 @@ pub fn upload_idl_by_url(
     program_id: &str,
     keypair_path: Option<&str>,
     priority_fees_per_cu: u64,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
     let upload_data = fetch_data_from_url(url)?;
-    upload_data_from_bytes(upload_data, program_id, keypair_path, priority_fees_per_cu, IDL_SEED)
+    upload_data_from_bytes(upload_data, program_id, keypair_path, priority_fees_per_cu, IDL_SEED, rpc_url)
 }
 
 pub fn upload_metadata_by_url(
@@ -68,9 +71,10 @@ pub fn upload_metadata_by_url(
     program_id: &str,
     keypair_path: Option<&str>,
     priority_fees_per_cu: u64,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
     let upload_data = fetch_data_from_url(url)?;
-    upload_data_from_bytes(upload_data, program_id, keypair_path, priority_fees_per_cu, METADATA_SEED)
+    upload_data_from_bytes(upload_data, program_id, keypair_path, priority_fees_per_cu, METADATA_SEED, rpc_url)
 }
 
 fn upload_data_by_file_path(
@@ -79,10 +83,11 @@ fn upload_data_by_file_path(
     keypair_path: Option<&str>,
     priority_fees_per_cu: u64,
     seed: &str,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
     let upload_data = fs::read(file_path)
         .map_err(|e| anyhow!("Failed to read file: {}", e))?;
-    upload_data_from_bytes(upload_data, program_id, keypair_path, priority_fees_per_cu, seed)
+    upload_data_from_bytes(upload_data, program_id, keypair_path, priority_fees_per_cu, seed, rpc_url)
 }
 
 // New core function that handles the actual upload
@@ -92,17 +97,18 @@ fn upload_data_from_bytes(
     keypair_path: Option<&str>,
     priority_fees_per_cu: u64,
     seed: &str,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
     // Get signer and RPC client
     let (signer, rpc_client) = if let Some(path) = keypair_path {
         let keypair = solana_sdk::signature::read_keypair_file(path)
             .map_err(|e| anyhow!("Failed to read keypair file: {}", e))?;
-        let rpc_client = get_user_config()
+        let rpc_client = get_user_config(rpc_url)
             .map(|(_, client)| client)
             .map_err(|e| anyhow!("Failed to get RPC client: {}", e))?;
         (keypair, rpc_client)
     } else {
-        get_user_config()
+        get_user_config(rpc_url)
             .map_err(|e| anyhow!("Failed to get user config: {}", e))?
     };
 
@@ -117,7 +123,7 @@ fn upload_data_from_bytes(
     let metadata_address = get_metadata_address(seed, &program_pubkey);
 
     // Initialize account
-    initialize(&program_pubkey, &signer, priority_fees_per_cu, seed)?;
+    initialize(&program_pubkey, &signer, priority_fees_per_cu, seed, &rpc_client)?;
 
     // Create buffer
     let (compressed_data, buffer_keypair) = create_buffer(upload_data, &rpc_client, &signer, priority_fees_per_cu)?;
@@ -137,8 +143,8 @@ fn initialize(
     signer: &Keypair,
     priority_fees_per_cu: u64,
     seed: &str,
+    rpc_client: &solana_client::rpc_client::RpcClient,
 ) -> Result<()> {
-    let (_, rpc_client) = get_user_config()?;
 
     let metadata_address = get_metadata_address(seed, program_pubkey);
 
@@ -243,7 +249,8 @@ fn create_buffer(
 fn write_buffer(
     compressed_data: Vec<u8>, 
     buffer_keypair: &Keypair, 
-    signer: &Keypair, rpc_client: &solana_client::rpc_client::RpcClient, 
+    signer: &Keypair, 
+    rpc_client: &solana_client::rpc_client::RpcClient, 
     priority_fees_per_cu: u64
 ) -> Result<(), anyhow::Error> {
     let mut offset = 0;
@@ -388,23 +395,26 @@ fn set_and_close_buffer(
 pub fn download_idl_to_file(
     program_id: &str,
     output_path: &str,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
-    download_data_to_file(program_id, output_path, IDL_SEED)
+    download_data_to_file(program_id, output_path, IDL_SEED, rpc_url)
 }
 
 pub fn download_metadata_to_file(
     program_id: &str,
     output_path: &str,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
-    download_data_to_file(program_id, output_path, METADATA_SEED)
+    download_data_to_file(program_id, output_path, METADATA_SEED, rpc_url)
 }
 
 pub fn download_data_to_file(
     program_id: &str,
     output_path: &str,
     seed: &str,
+    rpc_url: Option<&str>,
 ) -> Result<()> {
-    let (_, rpc_client) = get_user_config()?;
+    let (_, rpc_client) = get_user_config(rpc_url)?;
     
     // Parse program ID
     let program_pubkey = Pubkey::from_str(program_id)

@@ -38,6 +38,14 @@ pub fn get_clap_app() -> Command {
                                 .action(ArgAction::Set)
                                 .default_value("0")
                         )
+                        .arg(
+                            Arg::new("rpc-url")
+                                .help("RPC URL (optional, defaults to config)")
+                                .short('u')
+                                .long("rpc-url")
+                                .action(ArgAction::Set)
+                                .required(false)
+                        )
                 )
                 .subcommand(
                     Command::new("upload-url")
@@ -69,6 +77,14 @@ pub fn get_clap_app() -> Command {
                                 .long("priority-fees")
                                 .action(ArgAction::Set)
                                 .default_value("0")
+                        )
+                        .arg(
+                            Arg::new("rpc-url")
+                                .help("RPC URL (optional, defaults to config)")
+                                .short('u')
+                                .long("rpc-url")
+                                .action(ArgAction::Set)
+                                .required(false)
                         )
                 )
                 .subcommand(
@@ -122,6 +138,14 @@ pub fn get_clap_app() -> Command {
                                 .action(ArgAction::Set)
                                 .default_value("0")
                         )
+                        .arg(
+                            Arg::new("rpc-url")
+                                .help("RPC URL (optional, defaults to config)")
+                                .short('u')
+                                .long("rpc-url")
+                                .action(ArgAction::Set)
+                                .required(false)
+                        )
                 )
                 .subcommand(
                     Command::new("upload-url")
@@ -153,6 +177,14 @@ pub fn get_clap_app() -> Command {
                                 .long("priority-fees")
                                 .action(ArgAction::Set)
                                 .default_value("0")
+                        )
+                        .arg(
+                            Arg::new("rpc-url")
+                                .help("RPC URL (optional, defaults to config)")
+                                .short('u')
+                                .long("rpc-url")
+                                .action(ArgAction::Set)
+                                .required(false)
                         )
                 )
                 .subcommand(

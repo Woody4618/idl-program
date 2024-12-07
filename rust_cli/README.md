@@ -37,6 +37,7 @@ program-metadata idl download <PROGRAM_ID> [OUTPUT_PATH]
 Options:
   -k, --keypair <PATH>           Path to keypair file (optional, defaults to config)
   -p, --priority-fees <NUMBER>   Priority fees per compute unit (default: 0)
+  -u, --rpc-url <URL>           RPC URL (optional, defaults to config)
   --help                         Print help information
 ```
 
@@ -55,20 +56,21 @@ program-metadata metadata download <PROGRAM_ID> [OUTPUT_PATH]
 Options:
   -k, --keypair <PATH>           Path to keypair file (optional, defaults to config)
   -p, --priority-fees <NUMBER>   Priority fees per compute unit (default: 0)
+  -u, --rpc-url <URL>           RPC URL (optional, defaults to config)
   --help                         Print help information
 ```
 
 Examples:
 
 ```bash
-# Upload IDL using default keypair
-program-metadata idl upload ./target/idl/my_program.json GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj
+# Upload IDL using default keypair and custom RPC URL
+program-metadata idl upload ./target/idl/my_program.json GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj -u https://api.devnet.solana.com
 
-# Upload IDL from URL with custom keypair and priority fees
-program-metadata idl upload-url https://example.com/my_idl.json GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj -k ./my-keypair.json -p 1000
+# Upload IDL from URL with custom keypair, priority fees, and RPC URL
+program-metadata idl upload-url https://example.com/my_idl.json GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj -k ./my-keypair.json -p 1000 -u https://api.mainnet-beta.solana.com
 
-# Download IDL to default path (idl.json)
-program-metadata idl download GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj
+# Download IDL using custom RPC URL
+program-metadata idl download GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj -u https://api.testnet.solana.com
 
 # Upload metadata using default keypair
 program-metadata metadata upload ./metadata.json GrAkz4CQ4zKm9KhZ9Q7PkCmqDP7JuSGbpwGY8dxKt6Kj
