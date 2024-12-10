@@ -4,13 +4,13 @@
 resolution = true
 skip-lint = false
 
-[programs.localnet]
+[localnet]
 upload_idl_anchor = "pmetaypqG6SiB47xMigYVMAkuHDWeSDXcv3zzDrJJvA"
 
-[programs.devnet]
+[devnet]
 upload_idl_anchor = "pmetaypqG6SiB47xMigYVMAkuHDWeSDXcv3zzDrJJvA"
 
-[programs.mainnet-beta]
+[mainnet-beta]
 upload_idl_anchor = "pmetaypqG6SiB47xMigYVMAkuHDWeSDXcv3zzDrJJvA"
 
 [test.validator]

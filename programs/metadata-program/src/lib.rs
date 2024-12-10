@@ -69,7 +69,7 @@ pub mod metadata_program {
         }
 
         // When all is good create PDA and save authority for later upgrades.
-        ctx.accounts.pda.authority = *ctx.accounts.signer.key;
+        //ctx.accounts.pda.load_init()?.authority = *ctx.accounts.signer.key;
         Ok(())
     }
 
@@ -119,32 +119,38 @@ pub mod metadata_program {
         }
 
         // When all is good create PDA and save authority for later upgrades.
-        ctx.accounts.pda.authority = *ctx.accounts.signer.key;
+        ctx.accounts.pda.load_init()?.authority = *ctx.accounts.signer.key;
         Ok(())
     }
 
     pub fn write_buffer(ctx: Context<WriteBuffer>, data: Vec<u8>) -> Result<()> {
-        let prev_len: usize =
-            ::std::convert::TryInto::<usize>::try_into(ctx.accounts.buffer.data_len).unwrap();
-
-        let new_len: usize = prev_len.checked_add(data.len()).unwrap();
-
-        ctx.accounts.buffer.data_len = ctx
-            .accounts
-            .buffer
-            .data_len
-            .checked_add(::std::convert::TryInto::<u32>::try_into(data.len()).unwrap())
-            .unwrap();
-
-        let mut trailing_bytes = ctx.accounts.buffer.trailing_data_mut();
-        let data_expansion = &mut trailing_bytes[prev_len..new_len];
-        require_eq!(data_expansion.len(), data.len());
-        data_expansion.copy_from_slice(&data[..]);
+        let account_info = ctx.accounts.buffer.as_ref();
+        let mut account_data = account_info.try_borrow_mut_data()?;
+        
+        // Skip discriminator (8) + authority (32) + data_len (4)
+        const DATA_OFFSET: usize = 8 + 32 + 4;
+        
+        // Write data
+        let current_len = account_data[DATA_OFFSET-4..DATA_OFFSET]
+            .try_into()
+            .map(u32::from_le_bytes)
+            .unwrap_or(0) as usize;
+        
+        let new_len = current_len + data.len();
+        
+        // Update data_len
+        account_data[DATA_OFFSET-4..DATA_OFFSET]
+            .copy_from_slice(&(new_len as u32).to_le_bytes());
+        
+        // Write new data
+        account_data[DATA_OFFSET + current_len..DATA_OFFSET + new_len]
+            .copy_from_slice(&data);
+        
         Ok(())
     }
 
     pub fn create_buffer(ctx: Context<CreateBuffer>) -> Result<()> {
-        ctx.accounts.buffer.authority = *ctx.accounts.authority.key;
+        //ctx.accounts.buffer.load_mut()?.authority = *ctx.accounts.authority.key;
         Ok(())
     }
 
@@ -157,40 +163,49 @@ pub mod metadata_program {
     }
 
     pub fn set_authority(ctx: Context<MetadataAccounts>, new_authority: Pubkey) -> Result<()> {
-        ctx.accounts.pda.authority = new_authority;
+        ctx.accounts.pda.load_mut()?.authority = new_authority;
         Ok(())
     }
 
     pub fn set_buffer(ctx: Context<SetBuffer>, _seed: String) -> Result<()> {
-        ctx.accounts.pda.data_len = ctx.accounts.buffer.data_len;
-
-        use MetadataUploadTrailingData;
-        let buffer_len = ::std::convert::TryInto::<usize>::try_into(ctx.accounts.buffer.data_len).unwrap();
-        let mut target = ctx.accounts.pda.trailing_data_mut();
-        let source = &ctx.accounts.buffer.trailing_data()[..buffer_len];
-        require_gte!(target.len(), buffer_len);
-        target[..buffer_len].copy_from_slice(source);
+        const DATA_OFFSET: usize = 8 + 32 + 4;  // Skip discriminator + authority + data_len
+        
+        // Get source data
+        let buffer_info = ctx.accounts.buffer.as_ref();
+        let buffer_data = buffer_info.try_borrow_data()?;
+        let buffer_len = u32::from_le_bytes(buffer_data[DATA_OFFSET-4..DATA_OFFSET].try_into().unwrap());
+        
+        // Get destination data
+        let pda_info = ctx.accounts.pda.as_ref();
+        let mut pda_data = pda_info.try_borrow_mut_data()?;
+        
+        // Copy data length
+        pda_data[DATA_OFFSET-4..DATA_OFFSET].copy_from_slice(&buffer_len.to_le_bytes());
+        
+        // Copy actual data
+        pda_data[DATA_OFFSET..DATA_OFFSET + buffer_len as usize]
+            .copy_from_slice(&buffer_data[DATA_OFFSET..DATA_OFFSET + buffer_len as usize]);
         
         Ok(())
     }
 
-    use std::cell::{Ref, RefMut};
+    // use std::cell::{Ref, RefMut};
 
-    pub trait MetadataUploadTrailingData<'info> {
-        fn trailing_data(self) -> Ref<'info, [u8]>;
-        fn trailing_data_mut(self) -> RefMut<'info, [u8]>;
-    }
+    // pub trait MetadataUploadTrailingData<'info> {
+    //     fn trailing_data(self) -> Ref<'info, [u8]>;
+    //     fn trailing_data_mut(self) -> RefMut<'info, [u8]>;
+    // }
 
-    impl<'a, 'info: 'a> MetadataUploadTrailingData<'a> for &'a Account<'info, MetadataAccount> {
-        fn trailing_data(self) -> Ref<'a, [u8]> {
-            let info: &AccountInfo<'info> = self.as_ref();
-            Ref::map(info.try_borrow_data().unwrap(), |d| &d[44..])
-        }
-        fn trailing_data_mut(self) -> RefMut<'a, [u8]> {
-            let info: &AccountInfo<'info> = self.as_ref();
-            RefMut::map(info.try_borrow_mut_data().unwrap(), |d| &mut d[44..])
-        }
-    }
+    // impl<'a, 'info: 'a> MetadataUploadTrailingData<'a> for &'a Account<'info, MetadataAccount> {
+    //     fn trailing_data(self) -> Ref<'a, [u8]> {
+    //         let info: &AccountInfo<'info> = self.as_ref();
+    //         Ref::map(info.try_borrow_data().unwrap(), |d| &d[44..])
+    //     }
+    //     fn trailing_data_mut(self) -> RefMut<'a, [u8]> {
+    //         let info: &AccountInfo<'info> = self.as_ref();
+    //         RefMut::map(info.try_borrow_mut_data().unwrap(), |d| &mut d[44..])
+    //     }
+    // }
 }
 
 #[derive(Accounts)]
@@ -203,7 +218,7 @@ pub struct Initialize<'info> {
         payer = signer,
         space = 8 + 32 + 4,
     )]
-    pub pda: Account<'info, MetadataAccount>,
+    pub pda: AccountLoader<'info, MetadataAccount>,
     #[account(mut)]
     pub signer: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -224,7 +239,7 @@ pub struct InitializeWithSignerSeed<'info> {
         payer = signer,
         space = 8 + 32 + 4,
     )]
-    pub pda: Account<'info, MetadataAccount>,
+    pub pda: AccountLoader<'info, MetadataAccount>,
     #[account(mut)]
     pub signer: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -237,7 +252,7 @@ pub struct InitializeWithSignerSeed<'info> {
 #[derive(Accounts)]
 pub struct MetadataAccounts<'info> {
     #[account(mut, has_one = authority)]
-    pub pda: Account<'info, MetadataAccount>,
+    pub pda: AccountLoader<'info, MetadataAccount>,
     #[account(constraint = authority.key != &ERASED_AUTHORITY)]
     pub authority: Signer<'info>,
 }
@@ -250,12 +265,12 @@ pub struct Resize<'info> {
         mut,
         realloc = len as usize, 
         realloc::zero = true, 
-        realloc::payer = signer,
-        constraint = pda.authority == signer.key()
+        realloc::payer = authority,
+        //has_one = authority
     )]
-    pub pda: Account<'info, MetadataAccount>,
+    pub pda: AccountLoader<'info, MetadataAccount>,
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
     /// CHECK: This is the program id of the program you want to upload the metadata for.
     pub program_id: AccountInfo<'info>,
@@ -266,7 +281,7 @@ pub struct Resize<'info> {
 #[derive(Accounts)]
 pub struct CreateBuffer<'info> {
     #[account(zero)]
-    pub buffer: Account<'info, MetadataAccount>,
+    pub buffer: AccountLoader<'info, MetadataAccount>,
     #[account(constraint = authority.key != &ERASED_AUTHORITY)]
     pub authority: Signer<'info>,
 }
@@ -274,17 +289,18 @@ pub struct CreateBuffer<'info> {
 // Close buffer to claim back SOL
 #[derive(Accounts)]
 pub struct CloseBuffer<'info> {
-    #[account(mut, close = authority, constraint = buffer.authority == authority.key())]
-    pub buffer: Account<'info, MetadataAccount>,
+    #[account(mut, close = authority,
+        // has_one = authority
+        )]
+    pub buffer: AccountLoader<'info, MetadataAccount>,
     #[account(constraint = authority.key != &ERASED_AUTHORITY)]
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct WriteBuffer<'info> {
-    #[account(mut, constraint = buffer.authority == signer.key())]
-    pub buffer: Account<'info, MetadataAccount>,
-    #[account(mut, constraint = signer.key != &ERASED_AUTHORITY)]
+    #[account(mut)]
+    pub buffer: AccountLoader<'info, MetadataAccount>,
     pub signer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -294,24 +310,28 @@ pub struct WriteBuffer<'info> {
 #[instruction(seed: String)]
 pub struct SetBuffer<'info> {
     // The buffer with the new metadata.
-    #[account(mut, constraint = buffer.authority == pda.authority)]
-    pub buffer: Account<'info, MetadataAccount>,
+    #[account(mut)]
+    pub buffer: AccountLoader<'info, MetadataAccount>,
     // The pda account to be updated with the buffer's data.
-    #[account(mut, 
-        has_one = authority,
-        constraint = pda.authority == authority.key()
-    )]
-    pub pda: Account<'info, MetadataAccount>,
-    #[account(constraint = authority.key != &ERASED_AUTHORITY)]
+    #[account(mut)]
+    pub pda: AccountLoader<'info, MetadataAccount>,
     pub authority: Signer<'info>,
     /// CHECK: This is the program id of the program you want to upload the IDL for.
     pub program_id: AccountInfo<'info>,
 }
 
-#[account]
+// #[account]
+// pub struct MetadataAccount {
+//     authority: Pubkey,
+//     data_len: u32,
+//     // program id or seed needed? To make it easier to query the IDL by program id or seed.
+//     // The rest is compressed metadata bytes.
+// }
+
+#[account(zero_copy(unsafe))]
+#[repr(C)]
 pub struct MetadataAccount {
     authority: Pubkey,
     data_len: u32,
-    // program id or seed needed? To make it easier to query the IDL by program id or seed.
-    // The rest is compressed metadata bytes.
+    data: [u8; 40952],
 }

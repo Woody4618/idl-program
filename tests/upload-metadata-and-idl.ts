@@ -45,7 +45,7 @@ describe("Test metadata program with idl and program metadata", () => {
     await connection.confirmTransaction(airdropSig, "confirmed");
   });
 
-  it("Write IDL Url", async () => {
+  it.only("Write IDL Url", async () => {
     const url = "http://example.com";
 
     await uploadIdlUrl(url, TEST_IDL_PROGRAM, keypair, rpcUrl, 0, false);
@@ -61,7 +61,7 @@ describe("Test metadata program with idl and program metadata", () => {
     }
 
     const rawData = accountInfo.data.slice(44, 44 + idl.dataLen); // Skip metadata (44 bytes + 8 discriminator, 4 dataLen, 32 authority)
-    const decompressedData = inflate(rawData);
+    const decompressedData = inflate(idl.data);
     const decompressedUrl = Buffer.from(decompressedData).toString("utf8");
 
     console.log("Decompressed Url:", decompressedUrl);
